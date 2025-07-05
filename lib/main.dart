@@ -7,27 +7,36 @@ import 'data/models/calculation_model.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/calculator_screen.dart';
 
-void main() async {
-  // Ensure Flutter is initialized
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Hive - using a separate isolate would be better but requires more setup
+
+  // Initialize Hive and register adapter
   await Hive.initFlutter();
-  
-  // Register adapters
   Hive.registerAdapter(CalculationModelAdapter());
-  
-  // Only open essential boxes immediately
+
+  // Open essential settings box
   await Hive.openBox('app_settings');
-  
-  // Run the app
+
+  // Run the app first
   runApp(const ProviderScope(child: CalculatorApp()));
-  
-  // Defer opening history box until after UI is rendered
-  Future.delayed(const Duration(milliseconds: 300), () async {
-    await Hive.openBox<CalculationModel>('calculations');
+
+  // Open history box after first frame (safest and performant)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _openCalculationBox();
   });
 }
+
+// Separate method for deferred box opening
+Future<void> _openCalculationBox() async {
+  try {
+    if (!Hive.isBoxOpen('calculations')) {
+      await Hive.openBox<CalculationModel>('calculations');
+    }
+  } catch (e) {
+    debugPrint('❌ Error opening calculations box: $e');
+  }
+}
+
 
 class CalculatorApp extends ConsumerWidget {
   const CalculatorApp({super.key});
@@ -38,6 +47,7 @@ class CalculatorApp extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     
     return MaterialApp(
+      //  showPerformanceOverlay: true,
       title: 'Scientific Calculator',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,

@@ -1,36 +1,32 @@
-# Scientific Calculator App
+# Bilimsel Hesap Makinesi Uygulaması
 
-A modern scientific calculator application built with Flutter that follows the MVP (Model-View-Presenter) architecture and uses Riverpod for state management.
+Flutter ile geliştirilmiş, MVP (Model-View-Presenter) mimarisini benimseyen ve durum yönetimi için Riverpod kullanan modern bir bilimsel hesap makinesi uygulamasıdır.
 
-## Features
+## Özellikler
 
-- **Operator Precedence**: Follows BODMAS/PEMDAS rules for calculations
-- **Scientific Functions**: Includes sin, cos, tan, ln, log, square root, π, e, and factorial
-- **Parentheses Support**: For complex calculations
-- **History Tracking**: Saves calculation history using Hive
-- **Modern UI**: Clean design with a green and white color scheme
-- **Animations**: Smooth transitions and effects
-- **Responsive Design**: Works in both portrait and landscape orientations
-- **Haptic Feedback**: For better user experience
+- **İşlem Önceliği**: Hesaplamalar için BODMAS/PEMDAS kurallarına uyar.
+- **Bilimsel Fonksiyonlar**: Sin, cos, tan, ln, log, karekök, π, e ve faktöriyel gibi fonksiyonları içerir.
+- **Parantez Desteği**: Karmaşık hesaplamalar için parantez kullanımını destekler.
+- **Geçmiş Takibi**: Hesaplama geçmişini Hive veritabanı ile kaydeder.
+- **Modern Arayüz**: Yeşil ve beyaz renk şemasına sahip temiz bir tasarıma sahiptir.
+- **Animasyonlar**: Akıcı geçişler ve efektler sunar.
+- **Duyarlı Tasarım**: Hem dikey hem de yatay modda sorunsuz çalışır.
+- **Dokunsal Geri Bildirim**: Daha iyi bir kullanıcı deneyimi için dokunsal geri bildirim sağlar.
 
-## Architecture
+## Mimari
 
-This app follows the MVP (Model-View-Presenter) architecture:
-- **Model**: Handles data and business logic
-- **View**: UI components (screens, widgets)
-- **Presenter**: Mediates between Model and View
+Bu uygulama MVP (Model-View-Presenter) mimarisini kullanır:
+- **Model**: Veri ve iş mantığını yönetir.
+- **View (Görünüm)**: Arayüz bileşenlerini (ekranlar, widget'lar) içerir.
+- **Presenter (Sunucu)**: Model ve Görünüm arasındaki iletişimi sağlar.
 
-## Technical Details
+## Teknik Detaylar
 
-- **State Management**: Riverpod
-- **Local Storage**: Hive for history tracking
-- **Optimizations**: System fonts for better performance, const modifiers throughout
+- **Durum Yönetimi**: Riverpod
+- **Yerel Depolama**: Geçmiş takibi için Hive
+- **Optimizasyonlar**: Daha iyi performans için sistem yazı tipleri ve `const` kullanımı.
 
-## Getting Started
+## Başlarken
 
-To run this project locally:
+Projeyi yerel makinenizde çalıştırmak için:
 
-```bash
-flutter pub get
-flutter run
-```

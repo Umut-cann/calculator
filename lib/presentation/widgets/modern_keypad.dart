@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Needed for HapticFeedback
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/calculator_state.dart';
 import 'modern_calculator_button.dart';
 
+/// A calculator keypad with modern design
+/// Optimized for performance with button caching and efficient layout
 class ModernKeypad extends ConsumerStatefulWidget {
   const ModernKeypad({super.key});
 
@@ -13,261 +15,228 @@ class ModernKeypad extends ConsumerStatefulWidget {
 
 class _ModernKeypadState extends ConsumerState<ModernKeypad> {
   // Cache buttons to prevent rebuilding them on every state change
-  late final Map<String, Widget> _buttonCache = {};
+  final Map<String, Widget> _buttonCache = {};
+  
+  // Cache row layouts for better performance
+  final Map<String, Widget> _rowCache = {};
+  
+  // Memoize button press handlers
+  final Map<String, VoidCallback> _buttonHandlers = {};
+  
+  @override
+  void dispose() {
+    _buttonCache.clear();
+    _rowCache.clear();
+    _buttonHandlers.clear();
+    super.dispose();
+  }
   
   // Get a cached button or create and cache a new one
-  Widget _getCachedButton(BuildContext context, String text, {required ModernButtonType type, required double size}) {
+  Widget _getCachedButton(String text, {required ModernButtonType type, required double size}) {
     final key = '$text-$type-$size';
-    return _buttonCache.putIfAbsent(key, () => _buildButton(context, ref, text, type: type, size: size));
+    return _buttonCache.putIfAbsent(key, () => _buildButton(text, type: type, size: size));
+  }
+  
+  // Get a cached handler for button presses
+  VoidCallback _getCachedHandler(String text, ModernButtonType type) {
+    final key = '$text-$type';
+    return _buttonHandlers.putIfAbsent(key, () => () => _handleButtonPress(text, type));
+  }
+  
+  // Create a cached row of buttons
+  Widget _buildCachedRow(List<ButtonConfig> buttons, double size, {Key? key}) {
+    final rowKey = buttons.map((b) => '${b.text}-${b.type.name}').join('-') + '-$size';
+    
+    return _rowCache.putIfAbsent(rowKey, () {
+      return Row(
+        key: key,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisSize: MainAxisSize.max,
+        children: buttons.map((config) => 
+          Flexible(
+            fit: FlexFit.loose,
+            child: _getCachedButton(config.text, type: config.type, size: size),
+          )
+        ).toList(growable: false),
+      );
+    });
   }
   
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isLandscape = size.width > size.height;
+    // Use MediaQuery.of() only once
+    final mediaQuery = MediaQuery.of(context);
+    final screenSize = mediaQuery.size;
+    final isLandscape = screenSize.width > screenSize.height;
+    
+    // Use adaptive padding based on screen size
+    final padding = mediaQuery.padding.copyWith(
+      top: mediaQuery.padding.top + 8, 
+      bottom: mediaQuery.padding.bottom + 8
+    );
     
     return isLandscape 
-      ? _buildLandscapeKeypad(context, ref)
-      : _buildPortraitKeypad(context, ref);
+      ? _buildLandscapeKeypad(screenSize, padding)
+      : _buildPortraitKeypad(screenSize, padding);
   }
   
-  Widget _buildPortraitKeypad(BuildContext context, WidgetRef ref) {
-    final size = MediaQuery.of(context).size;
-    // Calculate button size with additional padding to prevent overflow
-    final buttonSize = (size.width - 80) / 4.2; // More conservative sizing
+  Widget _buildPortraitKeypad(Size screenSize, EdgeInsets padding) {
+    // Calculate button size once with optimized formula - use more conservative sizing
+    final availableWidth = screenSize.width - padding.horizontal - 36;
+    final buttonSize = availableWidth / 4.5; // Smaller size to prevent overflow
+    
+    // Define button configurations for each row
+    final rows = [
+      // Scientific functions row
+      [ButtonConfig('sin', ModernButtonType.function), ButtonConfig('cos', ModernButtonType.function), 
+       ButtonConfig('tan', ModernButtonType.function), ButtonConfig('π', ModernButtonType.constant)],
+      
+      // Additional functions
+      [ButtonConfig('log', ModernButtonType.function), ButtonConfig('ln', ModernButtonType.function), 
+       ButtonConfig('√', ModernButtonType.function), ButtonConfig('e', ModernButtonType.constant)],
+      
+      // First row of numbers/operations
+      [ButtonConfig('(', ModernButtonType.operator), ButtonConfig(')', ModernButtonType.operator), 
+       ButtonConfig('%', ModernButtonType.operator), ButtonConfig('AC', ModernButtonType.clear)],
+      
+      // Second row
+      [ButtonConfig('7', ModernButtonType.number), ButtonConfig('8', ModernButtonType.number), 
+       ButtonConfig('9', ModernButtonType.number), ButtonConfig('÷', ModernButtonType.operator)],
+      
+      // Third row
+      [ButtonConfig('4', ModernButtonType.number), ButtonConfig('5', ModernButtonType.number), 
+       ButtonConfig('6', ModernButtonType.number), ButtonConfig('×', ModernButtonType.operator)],
+      
+      // Fourth row
+      [ButtonConfig('1', ModernButtonType.number), ButtonConfig('2', ModernButtonType.number), 
+       ButtonConfig('3', ModernButtonType.number), ButtonConfig('-', ModernButtonType.operator)],
+      
+      // Fifth row
+      [ButtonConfig('0', ModernButtonType.number), ButtonConfig('.', ModernButtonType.number), 
+       ButtonConfig('=', ModernButtonType.equals), ButtonConfig('+', ModernButtonType.operator)],
+    ];
     
     return RepaintBoundary(
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
-        children: [
-          // Scientific functions row
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, 'sin', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, 'cos', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, 'tan', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, 'π', type: ModernButtonType.constant, size: buttonSize),
-              ],
-            ),
-          ),
-          // Additional functions
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, 'log', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, 'ln', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, '√', type: ModernButtonType.function, size: buttonSize),
-                _getCachedButton(context, 'e', type: ModernButtonType.constant, size: buttonSize),
-              ],
-            ),
-          ),
-          // First row of numbers/operations
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, '(', type: ModernButtonType.operator, size: buttonSize),
-                _getCachedButton(context, ')', type: ModernButtonType.operator, size: buttonSize),
-                _getCachedButton(context, '%', type: ModernButtonType.operator, size: buttonSize),
-                _getCachedButton(context, 'AC', type: ModernButtonType.clear, size: buttonSize),
-              ],
-            ),
-          ),
-          // Second row
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, '7', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '8', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '9', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '÷', type: ModernButtonType.operator, size: buttonSize),
-              ],
-            ),
-          ),
-          // Third row
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, '4', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '5', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '6', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '×', type: ModernButtonType.operator, size: buttonSize),
-              ],
-            ),
-          ),
-          // Fourth row
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, '1', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '2', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '3', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '-', type: ModernButtonType.operator, size: buttonSize),
-              ],
-            ),
-          ),
-          // Fifth row
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _getCachedButton(context, '0', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '.', type: ModernButtonType.number, size: buttonSize),
-                _getCachedButton(context, '=', type: ModernButtonType.equals, size: buttonSize),
-                _getCachedButton(context, '+', type: ModernButtonType.operator, size: buttonSize),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ));
-  }
-  
-  Widget _buildLandscapeKeypad(BuildContext context, WidgetRef ref) {
-    final size = MediaQuery.of(context).size;
-    // Use more conservative sizing to prevent overflow
-    final buttonSize = min(
-      (size.width - 140) / 8.2, 
-      (size.height - 100) / 4.2
-    ); // Calculate button size based on screen dimensions with safety margin
-    
-    return RepaintBoundary(
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Left section - Scientific functions
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, 'sin', type: ModernButtonType.function, size: buttonSize),
-                      _buildButton(context, ref, 'cos', type: ModernButtonType.function, size: buttonSize),
-                      _buildButton(context, ref, 'tan', type: ModernButtonType.function, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, 'log', type: ModernButtonType.function, size: buttonSize),
-                      _buildButton(context, ref, 'ln', type: ModernButtonType.function, size: buttonSize),
-                      _buildButton(context, ref, '√', type: ModernButtonType.function, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, 'π', type: ModernButtonType.constant, size: buttonSize),
-                      _buildButton(context, ref, 'e', type: ModernButtonType.constant, size: buttonSize),
-                      _buildButton(context, ref, '^', type: ModernButtonType.operator, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, '(', type: ModernButtonType.operator, size: buttonSize),
-                      _buildButton(context, ref, ')', type: ModernButtonType.operator, size: buttonSize),
-                      _buildButton(context, ref, '%', type: ModernButtonType.operator, size: buttonSize),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Right section - Numbers and basic operators
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, 'AC', type: ModernButtonType.clear, size: buttonSize),
-                      _buildButton(context, ref, '⌫', type: ModernButtonType.clear, size: buttonSize),
-                      _buildButton(context, ref, '÷', type: ModernButtonType.operator, size: buttonSize),
-                      _buildButton(context, ref, '×', type: ModernButtonType.operator, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, '7', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '8', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '9', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '-', type: ModernButtonType.operator, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, '4', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '5', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '6', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '+', type: ModernButtonType.operator, size: buttonSize),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildButton(context, ref, '1', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '2', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '3', type: ModernButtonType.number, size: buttonSize),
-                      _buildButton(context, ref, '=', type: ModernButtonType.equals, size: buttonSize),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ));
-  }
-  
-  Widget _buildButton(
-    BuildContext context, 
-    WidgetRef ref, 
-    String text, 
-    {required ModernButtonType type, required double size}
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(3.0),
-      child: ModernCalculatorButton(
-        text: text,
-        type: type,
-        size: size,
-        onPressed: () => _handleButtonPress(text, type, ref),
+          children: [
+            for (int i = 0; i < rows.length; i++)
+              Expanded(
+                key: ValueKey('portrait-row-$i'),
+                child: _buildCachedRow(rows[i], buttonSize, key: ValueKey('row-$i')),
+              ),
+          ],
+        ),
       ),
     );
   }
   
-  void _handleButtonPress(String text, ModernButtonType type, WidgetRef ref) {
-    // Add haptic feedback based on button type
+  Widget _buildLandscapeKeypad(Size screenSize, EdgeInsets padding) {
+    // Optimized button sizing calculation with more conservative values
+    final availableWidth = screenSize.width - padding.horizontal - 80; // More padding allowance
+    final availableHeight = screenSize.height - padding.vertical - 60;
+    
+    final buttonSize = _calculateOptimalButtonSize(
+      availableWidth / 8.5, // Reduce button size ratio
+      availableHeight / 4.5
+    );
+    
+    // Left section button configurations
+    final leftRows = [
+      [ButtonConfig('sin', ModernButtonType.function), ButtonConfig('cos', ModernButtonType.function), 
+       ButtonConfig('tan', ModernButtonType.function)],
+      
+      [ButtonConfig('log', ModernButtonType.function), ButtonConfig('ln', ModernButtonType.function), 
+       ButtonConfig('√', ModernButtonType.function)],
+      
+      [ButtonConfig('π', ModernButtonType.constant), ButtonConfig('e', ModernButtonType.constant), 
+       ButtonConfig('^', ModernButtonType.operator)],
+       
+      [ButtonConfig('(', ModernButtonType.operator), ButtonConfig(')', ModernButtonType.operator), 
+       ButtonConfig('%', ModernButtonType.operator)],
+    ];
+    
+    // Right section button configurations
+    final rightRows = [
+      [ButtonConfig('AC', ModernButtonType.clear), ButtonConfig('⌫', ModernButtonType.clear), 
+       ButtonConfig('÷', ModernButtonType.operator), ButtonConfig('×', ModernButtonType.operator)],
+      
+      [ButtonConfig('7', ModernButtonType.number), ButtonConfig('8', ModernButtonType.number), 
+       ButtonConfig('9', ModernButtonType.number), ButtonConfig('-', ModernButtonType.operator)],
+      
+      [ButtonConfig('4', ModernButtonType.number), ButtonConfig('5', ModernButtonType.number), 
+       ButtonConfig('6', ModernButtonType.number), ButtonConfig('+', ModernButtonType.operator)],
+      
+      [ButtonConfig('1', ModernButtonType.number), ButtonConfig('2', ModernButtonType.number), 
+       ButtonConfig('3', ModernButtonType.number), ButtonConfig('=', ModernButtonType.equals)],
+    ];
+    
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left section - Scientific functions
+            Expanded(
+              child: Column(
+                children: [
+                  for (int i = 0; i < leftRows.length; i++)
+                    Expanded(
+                      key: ValueKey('landscape-left-$i'),
+                      child: _buildCachedRow(leftRows[i], buttonSize, key: ValueKey('left-row-$i')),
+                    ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(width: 8), // Spacing between sections
+            
+            // Right section - Numbers and basic operators
+            Expanded(
+              child: Column(
+                children: [
+                  for (int i = 0; i < rightRows.length; i++)
+                    Expanded(
+                      key: ValueKey('landscape-right-$i'),
+                      child: _buildCachedRow(rightRows[i], buttonSize, key: ValueKey('right-row-$i')),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Optimized button builder with minimal padding
+  Widget _buildButton(
+    String text, 
+    {required ModernButtonType type, required double size}
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(2.0), // Reduced padding
+      child: ModernCalculatorButton(
+        key: ValueKey('btn-$text-${type.name}'),
+        text: text,
+        type: type,
+        size: size,
+        onPressed: _getCachedHandler(text, type),
+      ),
+    );
+  }
+  
+  // Calculate optimal button size based on available space
+  double _calculateOptimalButtonSize(double widthBased, double heightBased) {
+    // Add safety margin and use the smaller dimension
+    return (widthBased < heightBased ? widthBased : heightBased) * 0.9; // Reduce to 90% for safety
+  }
+  
+  // Handle button press with appropriate feedback and action
+  void _handleButtonPress(String text, ModernButtonType type) {
+    // Provide appropriate haptic feedback based on button type
     switch (type) {
       case ModernButtonType.equals:
         HapticFeedback.mediumImpact(); // Stronger feedback for equals
@@ -282,6 +251,7 @@ class _ModernKeypadState extends ConsumerState<ModernKeypad> {
     
     final notifier = ref.read(calculatorProvider.notifier);
     
+    // Process button action
     switch (text) {
       case 'AC':
         notifier.clear();
@@ -312,7 +282,10 @@ class _ModernKeypadState extends ConsumerState<ModernKeypad> {
   }
 }
 
-// Helper function to calculate minimum
-double min(double a, double b) {
-  return a < b ? a : b;
+// Button configuration data class for easier management
+class ButtonConfig {
+  final String text;
+  final ModernButtonType type;
+  
+  const ButtonConfig(this.text, this.type);
 }
